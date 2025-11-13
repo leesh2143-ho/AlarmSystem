@@ -4,13 +4,22 @@ from pathlib import Path
 from fastapi import FastAPI, Depends, HTTPException, Header, status, BackgroundTasks
 from sqlalchemy.orm import Session
 import datetime
+from contextlib import asynccontextmanager
 
 import models
 import email_service
 from models import HealthCheckPayload, AlertStatus, AlertState, get_db, create_db_and_tables
 
+# --- Lifespan event handler ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Create database and tables on application startup."""
+    create_db_and_tables()
+    logging.info("Database and tables created if they did not exist.")
+    yield
+
 # --- App and Logging Setup ---
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 # Setup logging
 log_file = Path("server.log")
@@ -22,13 +31,6 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-
-# --- Database Initialization ---
-@app.on_event("startup")
-def on_startup():
-    """Create database and tables on application startup."""
-    create_db_and_tables()
-    logging.info("Database and tables created if they did not exist.")
 
 # --- API Key Authentication ---
 def get_api_key_from_file():
