@@ -8,7 +8,7 @@ import logging
 import os
 
 # Configure basic logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s',filename='agent_log.log',filemode='a')
 
 def load_config():
     """Loads configuration from config.yaml."""

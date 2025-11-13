@@ -9,7 +9,7 @@ import datetime
 from datetime import timezone
 from fastapi import BackgroundTasks
 
-from models import AlertStatus, AlertState
+from models import AlertStatus, AlertState, SessionLocal
 
 MAX_RETRIES = 3
 
@@ -46,10 +46,12 @@ def send_email(subject, body, config):
         logging.error(f"Failed to send email '{subject}'. Error: {e}")
         return False
 
-def send_alert_email(alert_id: int, db: Session, background_tasks: BackgroundTasks):
+def send_alert_email(alert_id: int, background_tasks: BackgroundTasks):
     """Sends an email for a new or re-opened alert."""
+    db = SessionLocal()
     alert = db.query(AlertStatus).filter(AlertStatus.id == alert_id).first()
     if not alert:
+        db.close()
         return
 
     config = load_config()
@@ -72,10 +74,11 @@ def send_alert_email(alert_id: int, db: Session, background_tasks: BackgroundTas
         alert.retry_count = 0
         db.commit()
     else:
-        background_tasks.add_task(retry_send_alert, alert.id, 1, db, background_tasks)
+        background_tasks.add_task(retry_send_alert, alert.id, 1, background_tasks)
         logging.info(f"Scheduled retry for alert ID {alert.id}.")
+    db.close()
 
-def send_recovery_email(url: str, db: Session):
+def send_recovery_email(url: str):
     """Sends an email when a service has recovered."""
     config = load_config()
     subject = f"[RECOVERY] Service Restored: {url}"
@@ -89,12 +92,14 @@ def send_recovery_email(url: str, db: Session):
     """
     send_email(subject, body, config)
 
-def retry_send_alert(alert_id: int, attempt: int, db: Session, background_tasks: BackgroundTasks):
+def retry_send_alert(alert_id: int, attempt: int, background_tasks: BackgroundTasks):
     """Retries sending an alert email in the background."""
+    db = SessionLocal()
     config = load_config()
     if not config or attempt > MAX_RETRIES:
         if attempt > MAX_RETRIES:
             logging.error(f"Max retries reached for alert ID {alert_id}. Stopping retries.")
+        db.close()
         return
 
     time.sleep(config.get('RETRY_INTERVAL_SECONDS', 300))
@@ -103,6 +108,7 @@ def retry_send_alert(alert_id: int, attempt: int, db: Session, background_tasks:
 
     if not alert or alert.alert_state != AlertState.OPEN:
         logging.info(f"Alert ID {alert_id} is no longer in an open state. Cancelling retry.")
+        db.close()
         return
 
     logging.info(f"Retrying to send alert for {alert.url} (Attempt {attempt}/{MAX_RETRIES}).")
@@ -128,6 +134,6 @@ def retry_send_alert(alert_id: int, attempt: int, db: Session, background_tasks:
     else:
         alert.retry_count = attempt
         db.commit()
-        background_tasks = BackgroundTasks()
-        background_tasks.add_task(retry_send_alert, alert.id, attempt + 1, db)
+        background_tasks.add_task(retry_send_alert, alert.id, attempt + 1, background_tasks)
         logging.info(f"Scheduled next retry for alert ID {alert.id}.")
+    db.close()

@@ -83,7 +83,7 @@ async def receive_events(
                 db.commit()
                 db.refresh(alert) # Refresh to get the ID for the background task
                 logging.info(f"New alert for {result.url}. State: OPEN. Triggering notification.")
-                background_tasks.add_task(email_service.send_alert_email, alert.id, db, background_tasks)
+                background_tasks.add_task(email_service.send_alert_email, alert_id=alert.id, background_tasks=background_tasks)
             elif alert.alert_state == AlertState.RESOLVED:
                 # Recovered service failed again
                 alert.alert_state = AlertState.OPEN
@@ -93,7 +93,7 @@ async def receive_events(
                 alert.retry_count = 0
                 db.commit()
                 logging.info(f"Alert for recovered service {result.url}. State: OPEN. Triggering notification.")
-                background_tasks.add_task(email_service.send_alert_email, alert.id, db, background_tasks)
+                background_tasks.add_task(email_service.send_alert_email, alert_id=alert.id, background_tasks=background_tasks)
             else:
                 # Ongoing issue, do nothing
                 logging.info(f"Duplicate alert for {result.url}. State: {alert.alert_state}. No action taken.")
@@ -106,6 +106,6 @@ async def receive_events(
                 alert.retry_count = 0
                 db.commit()
                 logging.info(f"Service {result.url} has recovered from state {previous_state}. Triggering recovery notification.")
-                background_tasks.add_task(email_service.send_recovery_email, result.url, db)
+                background_tasks.add_task(email_service.send_recovery_email, url=result.url)
 
     return {"status": "Payload received and processed"}
