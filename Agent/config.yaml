@@ -1,0 +1,6 @@
+TARGET_URLS:
+  - "https://service1.com"
+  - "https://service2.com"
+SERVER_ADDRESS: "api.example.com"
+API_KEY: "YOUR_API_KEY_PLACEHOLDER"
+CHECK_INTERVAL_MINUTES: 5
